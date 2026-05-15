@@ -1,0 +1,5 @@
+venv/
+logs/*.csv
+__pycache__/
+*.pt
+test.jpg
