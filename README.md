@@ -1,50 +1,54 @@
-# Smart Factory - AI Quality Control
+# Smart factory: AI quality control
 
-A real-time edge computing system for automated quality control in a manufacturing environment. This project uses computer vision to detect product defects and provides a real-time dashboard for monitoring production stats.
+The smart factory is a real-time edge computing system designed for automated
+quality control in manufacturing environments. It uses computer vision to
+detect product defects and provides a dashboard for monitoring production
+statistics.
 
-## 🚀 Features
+## Features
 
-- **Real-time Detection**: Uses YOLOv8 (via Ultralytics) for high-speed defect detection.
-- **Hardware Integration**: Designed to work with Raspberry Pi and Picamera2.
-- **Messaging**: Publishes production stats (good vs. defective) to an MQTT broker.
-- **Dashboard**: A Flask-based web interface to visualize production metrics in real-time.
-- **Logging**: Keeps a persistent record of all detections in CSV format.
+- Real-time detection: Uses YOLOv8 for high-speed defect detection.
+- Hardware integration: Designed for Raspberry Pi and Picamera2.
+- Messaging: Publishes production statistics to an MQTT broker.
+- Dashboard: Features a Flask-based web interface for real-time production
+  metrics.
+- Logging: Maintains persistent records of detections in CSV format.
 
-## 📂 Project Structure
+## Project structure
 
 - `src/detect.py`: Main detection loop and camera interface.
 - `src/dashboard.py`: Flask web server for the visualization dashboard.
-- `src/mqtt_client.py`: Shared MQTT logic for sending/receiving data.
-- `models/`: Directory for trained YOLO models (e.g., `best.pt`).
+- `src/mqtt_client.py`: Shared MQTT logic for data transmission.
+- `models/`: Directory for trained YOLO models.
 - `logs/`: CSV logs for production history.
 
-## 🛠️ Setup
+## Setup
 
-1. **Clone the repository**:
+Follow these steps to configure the system:
+
+1. Clone the repository:
    ```bash
    git clone <repo-url>
    cd smart-factory
    ```
-
-2. **Create a virtual environment**:
+2. Create a virtual environment:
    ```bash
    python3 -m venv venv
    source venv/bin/activate
    ```
-
-3. **Install dependencies**:
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-   *Note: For CPU-only environments, use `--extra-index-url https://download.pytorch.org/whl/cpu`.*
-
-4. **Run the system**:
-   - Start the MQTT broker (e.g., Mosquitto).
+4. Run the system:
+   - Start the MQTT broker.
    - Run the detector: `python src/detect.py`
    - Run the dashboard: `python src/dashboard.py`
 
-## 📊 Dashboard
-The dashboard will be available at `http://localhost:5000` by default.
+## Dashboard
 
-## 📝 License
-MIT
+The dashboard is accessible at `http://localhost:5000` by default.
+
+## License
+
+This project is licensed under the MIT License.
