@@ -4,6 +4,7 @@ import os
 import csv
 import time
 from datetime import datetime
+from picamera2 import Picamera2
 from ultralytics import YOLO
 sys.path.append(os.path.dirname(__file__))
 from mqtt_client import connect, send_counts
@@ -14,30 +15,18 @@ LOG_PATH   = "logs/production.csv"
 CONF       = 0.5
 IMG_SIZE   = 320
 SEND_EVERY = 5   # envoie MQTT toutes les 5 détections
-
-# IP Webcam (Phone) Config
-PHONE_IP   = "192.168.1.13"
-STREAM_URL = f"http://{PHONE_IP}:8080/video"
 # ────────────────────────────────────────────────────
 
 model = YOLO(MODEL_PATH)
+connect()
 
-try:
-    connect()
-except Exception as e:
-    print(f"⚠️ Warning: MQTT Broker non disponible. ({e})")
-
-# Init caméra (Phone via IP Webcam)
-print(f"🔗 Connexion au téléphone : {STREAM_URL}")
-cap = cv2.VideoCapture(STREAM_URL)
-
-if not cap.isOpened():
-    print("⚠️ Impossible d'accéder au téléphone. Essai avec la webcam locale...")
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("❌ Erreur: Aucune source vidéo trouvée.")
-        sys.exit(1)
-
+# Init caméra
+picam = Picamera2()
+config = picam.create_preview_configuration(
+    main={"size": (IMG_SIZE, IMG_SIZE), "format": "RGB888"}
+)
+picam.configure(config)
+picam.start()
 time.sleep(1)
 
 # Init CSV log
@@ -57,16 +46,10 @@ print("🚀 Détection démarrée — Ctrl+C pour arrêter")
 try:
     while True:
         # Capture frame
-        ret, frame = cap.read()
-        if not ret:
-            print("⚠️ Flux vidéo interrompu.")
-            break
-
-        # Convert BGR (OpenCV) to RGB (YOLO)
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = picam.capture_array()
 
         # Inférence
-        results = model(frame_rgb, conf=CONF, imgsz=IMG_SIZE, verbose=False)[0]
+        results = model(frame, conf=CONF, imgsz=IMG_SIZE, verbose=False)[0]
 
         # Logique: Si un défaut est détecté -> Defective. Sinon -> Good.
         if len(results.boxes) > 0:
@@ -105,4 +88,4 @@ except KeyboardInterrupt:
     print(f"   Good     : {counts['good']}")
     print(f"   Defective: {counts['defective']}")
     print(f"   Total    : {total}")
-    cap.release()
+    picam.stop()
