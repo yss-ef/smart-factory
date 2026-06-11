@@ -14,6 +14,14 @@ stats = {"good": 0, "defective": 0, "total": 0, "last_update": "-"}
 alerts_log = []
 history_series = {"timestamps": [], "good": [], "defective": []}
 
+import os
+import ssl
+
+# Configuration MQTT Secure pour le Dashboard
+CA_CERT = "certs/ca.crt"
+BROKER = os.getenv("MQTT_BROKER", "localhost")
+PORT = int(os.getenv("MQTT_PORT", 8883))
+
 # ── MQTT ────────────────────────────────────────────
 def on_message(client, userdata, msg):
     global stats, alerts_log
@@ -52,7 +60,17 @@ def on_message(client, userdata, msg):
 
 mqttc = mqtt.Client()
 mqttc.on_message = on_message
-mqttc.connect("localhost", 1883)
+
+# Activation TLS si le certificat existe
+if os.path.exists(CA_CERT):
+    logging.info("Dashboard : Activation TLS pour MQTT")
+    mqttc.tls_set(ca_certs=CA_CERT, cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2)
+    mqttc.tls_insecure_set(True)
+else:
+    logging.warning("Dashboard : Certificat non trouvé, connexion non chiffrée")
+    PORT = 1883
+
+mqttc.connect(BROKER, PORT)
 mqttc.subscribe([("factory/counts", 0), ("factory/alerts", 0)])
 mqttc.loop_start()
 
