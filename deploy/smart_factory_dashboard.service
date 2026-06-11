@@ -1,0 +1,14 @@
+[Unit]
+Description=Smart Factory Dashboard Service
+After=network.target
+
+[Service]
+ExecStart=/home/youssef/Projects/Academic/IoT/smart_factory/venv/bin/python3 /home/youssef/Projects/Academic/IoT/smart_factory/src/dashboard.py
+WorkingDirectory=/home/youssef/Projects/Academic/IoT/smart_factory
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=youssef
+
+[Install]
+WantedBy=multi-user.target

@@ -3,89 +3,127 @@ import sys
 import os
 import csv
 import time
+import logging
 from datetime import datetime
 from picamera2 import Picamera2
 from ultralytics import YOLO
-sys.path.append(os.path.dirname(__file__))
-from mqtt_client import connect, send_counts
 
-# ── Config ──────────────────────────────────────────
+sys.path.append(os.path.dirname(__file__))
+from mqtt_client import connect, send_counts, send_alert
+
+# ── Configuration ─────────────────────────────────────
 MODEL_PATH = "models/best.pt"
 LOG_PATH   = "logs/production.csv"
 CONF       = 0.5
 IMG_SIZE   = 320
-SEND_EVERY = 5   # envoie MQTT toutes les 5 détections
-# ────────────────────────────────────────────────────
+SEND_STATS_EVERY = 5 
+GPIO_SIGNAL_PIN  = 18 # Pin simulée pour le signal électrique
+# ──────────────────────────────────────────────────────
 
-model = YOLO(MODEL_PATH)
+# Codes ANSI
+CLR_RED    = "\033[91m"
+CLR_GREEN  = "\033[92m"
+CLR_YELLOW = "\033[93m"
+CLR_BOLD   = "\033[1m"
+CLR_END    = "\033[0m"
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+
+def init_camera():
+    try:
+        picam = Picamera2()
+        config = picam.create_preview_configuration(
+            main={"size": (IMG_SIZE, IMG_SIZE), "format": "RGB888"}
+        )
+        picam.configure(config)
+        picam.start()
+        logging.info(f"{CLR_GREEN}CAMÉRA INITIALISÉE{CLR_END}")
+        return picam
+    except Exception as e:
+        logging.error(f"{CLR_RED}ERREUR CAMÉRA : {e}{CLR_END}")
+        return None
+
+# Simulation GPIO
+def trigger_electric_signal(duration=0.5):
+    logging.info(f"{CLR_YELLOW}{CLR_BOLD}SIGNAL ÉLECTRIQUE : ACTIVÉ (GPIO {GPIO_SIGNAL_PIN}){CLR_END}")
+    time.sleep(duration)
+    logging.info(f"{CLR_YELLOW}SIGNAL ÉLECTRIQUE : DÉSACTIVÉ{CLR_END}")
+
+# Init Modèle
+try:
+    model = YOLO(MODEL_PATH)
+except Exception as e:
+    logging.error(f"{CLR_RED}ERREUR CHARGEMENT MODÈLE : {e}{CLR_END}")
+    sys.exit(1)
+
 connect()
+picam = init_camera()
 
-# Init caméra
-picam = Picamera2()
-config = picam.create_preview_configuration(
-    main={"size": (IMG_SIZE, IMG_SIZE), "format": "RGB888"}
-)
-picam.configure(config)
-picam.start()
-time.sleep(1)
-
-# Init CSV log
+# Init Logs
 if not os.path.exists(os.path.dirname(LOG_PATH)):
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
 
-with open(LOG_PATH, "a", newline="") as f:
-    writer = csv.writer(f)
-    if os.path.getsize(LOG_PATH) == 0:
-        writer.writerow(["timestamp", "label", "confidence"])
+if not os.path.exists(LOG_PATH) or os.path.getsize(LOG_PATH) == 0:
+    with open(LOG_PATH, "w", newline="") as f:
+        csv.writer(f).writerow(["timestamp", "label", "confidence"])
 
 counts = {"good": 0, "defective": 0}
 total  = 0
 
-print("🚀 Détection démarrée — Ctrl+C pour arrêter")
+logging.info(f"{CLR_GREEN}{CLR_BOLD}SYSTÈME DE DÉTECTION PRÊT{CLR_END}")
 
 try:
     while True:
-        # Capture frame
-        frame = picam.capture_array()
+        if picam is None:
+            logging.warning(f"{CLR_YELLOW}TENTATIVE DE RECONNEXION CAMÉRA DANS 5S...{CLR_END}")
+            time.sleep(5)
+            picam = init_camera()
+            continue
 
-        # Inférence
+        try:
+            frame = picam.capture_array()
+        except Exception as e:
+            logging.error(f"{CLR_RED}ÉCHEC CAPTURE FRAME : {e}{CLR_END}")
+            picam = None
+            continue
+
         results = model(frame, conf=CONF, imgsz=IMG_SIZE, verbose=False)[0]
 
-        # Logique: Si un défaut est détecté -> Defective. Sinon -> Good.
+        # Logique de détection
         if len(results.boxes) > 0:
             key = "defective"
-            # On logue le défaut le plus probable
             top_box = results.boxes[0]
             label   = model.names[int(top_box.cls[0])]
             conf    = float(top_box.conf[0])
-            print(f"[DEFECT] {label} detected ({conf:.2f})")
+            
+            # ACTIONS IMMÉDIATES
+            send_alert(label, conf)
+            trigger_electric_signal(0.3)
         else:
             key = "good"
             label = "OK"
             conf = 1.0
-            print("[SAFE] PCB quality OK")
 
         counts[key] += 1
         total += 1
 
         # Log CSV
-        with open(LOG_PATH, "a", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                label,
-                f"{conf:.2f}"
-            ])
+        try:
+            with open(LOG_PATH, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), label, f"{conf:.2f}"])
+        except Exception as e:
+            logging.error(f"{CLR_RED}ERREUR ÉCRITURE LOG : {e}{CLR_END}")
 
-        # Envoie MQTT périodiquement
-        if total % SEND_EVERY == 0:
+        # Stats périodiques
+        if total % SEND_STATS_EVERY == 0:
             send_counts(counts["good"], counts["defective"], total)
 
-        time.sleep(0.1)
+        time.sleep(0.05) # Fluidité
 
 except KeyboardInterrupt:
-    print(f"\n✅ Session terminée")
-    print(f"   Good     : {counts['good']}")
-    print(f"   Defective: {counts['defective']}")
-    print(f"   Total    : {total}")
-    picam.stop()
+    logging.info("Interruption manuelle détectée")
+finally:
+    if picam:
+        picam.stop()
+    logging.info("Système arrêté proprement")
