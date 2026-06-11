@@ -5,11 +5,18 @@ import csv
 import time
 import logging
 from datetime import datetime
+# Codes ANSI
+CLR_RED    = "\033[91m"
+CLR_GREEN  = "\033[92m"
+CLR_YELLOW = "\033[93m"
+CLR_BOLD   = "\033[1m"
+CLR_END    = "\033[0m"
+
 try:
     from picamera2 import Picamera2
 except ImportError:
     from camera_mock import Picamera2
-    logging.warning(f"{CLR_YELLOW}PICAMERA2 NON DÉTECTÉ - MODE SIMULATION ACTIVÉ{CLR_END}")
+    print(f"{CLR_YELLOW}PICAMERA2 NON DÉTECTÉ - MODE SIMULATION ACTIVÉ{CLR_END}")
 from ultralytics import YOLO
 
 sys.path.append(os.path.dirname(__file__))
@@ -23,13 +30,6 @@ IMG_SIZE   = 320
 SEND_STATS_EVERY = 5 
 GPIO_SIGNAL_PIN  = 18 # Pin simulée pour le signal électrique
 # ──────────────────────────────────────────────────────
-
-# Codes ANSI
-CLR_RED    = "\033[91m"
-CLR_GREEN  = "\033[92m"
-CLR_YELLOW = "\033[93m"
-CLR_BOLD   = "\033[1m"
-CLR_END    = "\033[0m"
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
