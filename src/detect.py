@@ -5,7 +5,11 @@ import csv
 import time
 import logging
 from datetime import datetime
-from picamera2 import Picamera2
+try:
+    from picamera2 import Picamera2
+except ImportError:
+    from camera_mock import Picamera2
+    logging.warning(f"{CLR_YELLOW}PICAMERA2 NON DÉTECTÉ - MODE SIMULATION ACTIVÉ{CLR_END}")
 from ultralytics import YOLO
 
 sys.path.append(os.path.dirname(__file__))
